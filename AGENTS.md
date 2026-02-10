@@ -481,6 +481,8 @@ Brief description of changes
 2. **Push regularly**: `git push origin feature/your-feature-name`
 3. **Run tests**: `make test` before each commit
 4. **Security checks**: `make security` before PR
+5. **Type checking**: `make lint` includes mypy type validation
+6. **Coverage check**: Ensure >90% test coverage before PR
 
 #### When Stuck or Code Fails
 1. **Revert to last working commit**: `git reset --hard HEAD~1`
@@ -496,12 +498,18 @@ Brief description of changes
 - **Never work directly on main/develop**
 - **Ask for confirmation** before destructive operations
 - **Provide rollback options** in suggestions
+- **Add comprehensive type hints** to all functions
+- **Write tests for new code** before suggesting merge
+- **Run mypy type checking** before completing changes
 
 #### For KiloSoft AI  
 - **Review code before suggesting merges**
 - **Check security implications** of changes
 - **Validate commit messages** follow convention
 - **Ensure tests pass** before PR approval
+- **Verify type hints are comprehensive**
+- **Check test coverage meets >90% requirement**
+- **Run security scans** on proposed changes
 
 ### Emergency Procedures
 
@@ -533,7 +541,7 @@ git merge --no-ff hotfix/critical-issue
 git push origin main
 ```
 
-## �📋 Agent Guidelines
+## � Agent Guidelines
 
 ### Development Agent Responsibilities
 
@@ -542,17 +550,111 @@ git push origin main
 3. **Testing**: Maintain >90% test coverage for critical paths
 4. **Documentation**: Update docs for all API changes
 5. **Performance**: Monitor and optimize database queries
+6. **Type Safety**: Use comprehensive type hints throughout codebase
+7. **Test Coverage**: Write tests for all new features and functions
+
+### Code Quality Standards
+
+#### Type Hints Requirements
+- **All functions must have type hints** for parameters and return values
+- **Use specific types** instead of generic `Any` when possible
+- **Import types from typing module** for complex type definitions
+- **Create TypedDict classes** for structured data
+- **Use Optional[]** for nullable parameters
+- **Document complex types** with inline comments
+
+#### Type Hint Examples
+```python
+# Good: Comprehensive type hints
+from typing import List, Optional, Dict, TypedDict
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+class UserData(TypedDict):
+    email: str
+    username: str
+    password: str
+
+def create_user(data: UserData) -> Optional[User]:
+    """Create user with validated data."""
+    return User.objects.create_user(**data)
+
+def get_user_by_email(email: str) -> Optional[User]:
+    """Get user by email address."""
+    try:
+        return User.objects.get(email=email)
+    except User.DoesNotExist:
+        return None
+
+# API views with proper typing
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register(request: Request) -> Response:
+    """Register new user with enhanced security."""
+    serializer = UserSerializer(data=request.data)
+    if serializer.is_valid():
+        user: User = serializer.save()
+        return Response({'user_id': user.id}, status=201)
+    return Response(serializer.errors, status=400)
+```
+
+#### Testing Requirements
+- **Write tests for all new functions** and methods
+- **Test both happy path and error cases**
+- **Use descriptive test method names**
+- **Test type annotations** with mypy
+- **Mock external dependencies** appropriately
+- **Maintain >90% test coverage** for critical code
+
+#### Test Examples
+```python
+# Good: Comprehensive test with type hints
+class UserModelTests(TestCase):
+    """Test cases for User model."""
+    
+    def setUp(self) -> None:
+        """Set up test data."""
+        self.user_data: UserData = {
+            'email': 'test@example.com',
+            'username': 'testuser',
+            'password': 'SecurePass123!'
+        }
+    
+    def test_create_user_with_totp(self) -> None:
+        """Test user creation with TOTP functionality."""
+        user = User.objects.create_user(**self.user_data)
+        
+        # Generate TOTP secret
+        secret: str = user.generate_totp_secret()
+        self.assertIsNotNone(secret)
+        
+        # Verify TOTP token
+        token_valid: bool = user.verify_totp('123456')
+        self.assertIsInstance(token_valid, bool)
+    
+    def test_user_registration_api(self) -> None:
+        """Test user registration API endpoint."""
+        url = reverse('authentication:register')
+        response: Response = self.client.post(url, self.user_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('user_id', response.data)
+```
 
 ### Code Review Checklist
 
 - [ ] Security implications reviewed
-- [ ] Tests written and passing
+- [ ] Tests written and passing (>90% coverage)
 - [ ] Documentation updated
 - [ ] Performance impact assessed
 - [ ] Error handling implemented
 - [ ] Logging appropriate (no sensitive data)
 - [ ] Dependencies vetted
 - [ ] Migration scripts provided
+- [ ] **Type hints added for all functions**
+- [ ] **Type checking passes with mypy**
+- [ ] **Tests cover type annotations**
+- [ ] **No `Any` types used without justification**
 
 ### Deployment Checklist
 

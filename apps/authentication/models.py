@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+from typing import List, Optional
 import secrets
 import pyotp
 
@@ -37,15 +38,15 @@ class User(AbstractUser):
             models.Index(fields=['username']),
         ]
     
-    def __str__(self):
+    def __str__(self) -> str:
         return self.email
     
-    def generate_totp_secret(self):
+    def generate_totp_secret(self) -> str:
         """Generate new TOTP secret for 2FA."""
         self.totp_secret = pyotp.random_base32()
         return self.totp_secret
     
-    def get_totp_uri(self):
+    def get_totp_uri(self) -> Optional[str]:
         """Get TOTP URI for QR code generation."""
         if not self.totp_secret:
             return None
@@ -54,19 +55,19 @@ class User(AbstractUser):
             issuer_name="Password Manager"
         )
     
-    def verify_totp(self, token):
+    def verify_totp(self, token: str) -> bool:
         """Verify TOTP token."""
         if not self.totp_secret or not self.totp_enabled:
             return False
         return pyotp.totp.TOTP(self.totp_secret).verify(token)
     
-    def generate_backup_codes(self):
+    def generate_backup_codes(self) -> List[str]:
         """Generate 10 backup codes."""
         self.backup_codes = [secrets.token_hex(4) for _ in range(10)]
         self.save()
         return self.backup_codes
     
-    def use_backup_code(self, code):
+    def use_backup_code(self, code: str) -> bool:
         """Use and remove a backup code."""
         if code in self.backup_codes:
             self.backup_codes.remove(code)
@@ -74,20 +75,20 @@ class User(AbstractUser):
             return True
         return False
     
-    def is_account_locked(self):
+    def is_account_locked(self) -> bool:
         """Check if account is locked due to failed attempts."""
         if self.locked_until:
             return timezone.now() < self.locked_until
         return False
     
-    def increment_failed_login(self):
+    def increment_failed_login(self) -> None:
         """Increment failed login attempts and lock if necessary."""
         self.failed_login_attempts += 1
         if self.failed_login_attempts >= 5:
             self.locked_until = timezone.now() + timezone.timedelta(minutes=30)
         self.save()
     
-    def reset_failed_login(self):
+    def reset_failed_login(self) -> None:
         """Reset failed login attempts on successful login."""
         self.failed_login_attempts = 0
         self.locked_until = None
@@ -113,7 +114,7 @@ class UserSession(models.Model):
             models.Index(fields=['last_activity']),
         ]
     
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user.email} - {self.ip_address}"
 
 
@@ -132,7 +133,7 @@ class SecurityLog(models.Model):
         ('password_reset', 'Password Reset'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='security_logs')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='security_logs', null=True)
     event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
     ip_address = models.GenericIPAddressField()
     user_agent = models.TextField(blank=True)
@@ -147,5 +148,5 @@ class SecurityLog(models.Model):
             models.Index(fields=['timestamp']),
         ]
     
-    def __str__(self):
-        return f"{self.user.email} - {self.event_type} - {self.timestamp}"
+    def __str__(self) -> str:
+        return f"{self.user.email if self.user else 'Unknown'} - {self.event_type} - {self.timestamp}"
