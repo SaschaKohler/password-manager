@@ -1,9 +1,3 @@
-"""
-Django settings for config project.
-
-Uses modular settings structure with base.py and test.py
-"""
-
 from pathlib import Path
 import environ
 import os

@@ -56,7 +56,7 @@ class UserModelTests(TestCase):
         # Get TOTP URI
         uri = user.get_totp_uri()
         self.assertIsNotNone(uri)
-        self.assertIn('totpuser', uri)
+        self.assertIn('totp%40example.com', uri)  # URL-encoded email
         
         # Verify TOTP token
         totp = pyotp.TOTP(secret)
@@ -328,6 +328,8 @@ class SecurityTests(TestCase):
     
     def test_password_validation(self) -> None:
         """Test password validation requirements."""
+        from django.core.exceptions import ValidationError
+        
         weak_passwords = [
             '123456',  # Too short
             'password',  # Common password
@@ -336,7 +338,7 @@ class SecurityTests(TestCase):
         ]
         
         for weak_pass in weak_passwords:
-            with self.assertRaises(Exception):
+            with self.assertRaises(ValidationError):
                 User.objects.create_user(
                     email=f'test_{weak_pass}@example.com',
                     username=f'test_{weak_pass}',

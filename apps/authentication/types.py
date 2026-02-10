@@ -134,9 +134,9 @@ class SecurityContext(TypedDict):
     request: Request
 
 
-class ValidationErrorDict(TypedDict):
+class ValidationErrorDict(TypedDict, total=False):
     """Type definition for validation errors."""
-    [field_name: str]: List[str]
+    field_name: List[str]
 
 
 class DatabaseFieldTypes:

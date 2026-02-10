@@ -1,6 +1,6 @@
-from django.db.models.signals import post_save, user_logged_in, user_logged_out
+from django.db.models.signals import post_save
+from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
 from django.dispatch import receiver
-from django.contrib.auth.signals import user_login_failed
 from django.utils import timezone
 from .models import User, UserSession, SecurityLog
 import ipaddress
@@ -89,6 +89,9 @@ def log_failed_login(sender, credentials, request, **kwargs):
 
 def get_client_ip(request):
     """Get client IP address from request."""
+    if not request:
+        return '0.0.0.0'
+    
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
         ip = x_forwarded_for.split(',')[0]
