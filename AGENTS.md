@@ -372,7 +372,168 @@ locust -f tests/locustfile.py --host=http://localhost:8000
 python manage.py test --settings=config.settings.test --parallel
 ```
 
-## 📋 Agent Guidelines
+## � Development Workflow
+
+### Branching Strategy
+
+#### Branch Naming Convention
+- **Features**: `feature/feature-name`
+- **Extensions**: `extension/extension-name`  
+- **Documentation**: `docs/doc-name`
+- **Experimental**: `experimental/feature-name`
+- **Bugfixes**: `bugfix/description`
+- **Hotfixes**: `hotfix/critical-fix`
+
+#### Branch Creation Rules
+1. **Every feature gets its own branch** - no exceptions
+2. **Branch from `develop`** for features
+3. **Branch from `main`** only for hotfixes
+4. **Descriptive names** - no `feature-1` or `temp-branch`
+
+### Git Workflow
+
+#### Commit Frequency
+- **Commit often, commit early** - after every meaningful change
+- **Atomic commits** - one logical change per commit
+- **Revert-friendly** - commits should be easily reversible
+- **Fail-fast recovery** - if code breaks, revert to last working commit
+
+#### Commit Message Format
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix  
+- `docs`: Documentation
+- `style`: Code style (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Adding tests
+- `chore`: Maintenance tasks
+
+**Examples:**
+```
+feat(auth): add 2FA with TOTP support
+fix(crypto): resolve encryption key rotation issue
+docs(api): update authentication endpoints documentation
+refactor(models): simplify password encryption logic
+```
+
+### Pull Request Process
+
+#### PR Requirements
+1. **Create PR for every branch** before merging
+2. **Title must follow commit format**
+3. **Description must include**:
+   - What was changed
+   - Why it was changed
+   - How to test
+   - Screenshots if UI changes
+
+#### PR Template
+```markdown
+## Description
+Brief description of changes
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+
+## Security Review
+- [ ] No sensitive data logged
+- [ ] Input validation implemented
+- [ ] Encryption properly handled
+
+## Checklist
+- [ ] Code follows style guidelines
+- [ ] Self-review completed
+- [ ] Documentation updated
+- [ ] Tests added/updated
+```
+
+#### Merge Strategy
+- **Squash merge** for feature branches
+- **Merge commit** for hotfixes
+- **Never force push** to shared branches
+- **Delete feature branches** after merge
+
+### Development Environment Rules
+
+#### Before Starting Work
+1. **Create new branch**: `git checkout -b feature/your-feature-name`
+2. **Pull latest changes**: `git pull origin develop`
+3. **Setup environment**: `make dev`
+
+#### During Development
+1. **Commit frequently**: `git add . && git commit -m "feat(scope): progress message"`
+2. **Push regularly**: `git push origin feature/your-feature-name`
+3. **Run tests**: `make test` before each commit
+4. **Security checks**: `make security` before PR
+
+#### When Stuck or Code Fails
+1. **Revert to last working commit**: `git reset --hard HEAD~1`
+2. **Create new branch**: `git checkout -b feature/alternative-approach`
+3. **Document failure**: Add notes to PR description
+4. **Ask for help**: Tag team members in PR
+
+### AI Assistant Guidelines
+
+#### For Windsurf AI
+- **Always create branches** before making changes
+- **Commit after each major change** with descriptive messages
+- **Never work directly on main/develop**
+- **Ask for confirmation** before destructive operations
+- **Provide rollback options** in suggestions
+
+#### For KiloSoft AI  
+- **Review code before suggesting merges**
+- **Check security implications** of changes
+- **Validate commit messages** follow convention
+- **Ensure tests pass** before PR approval
+
+### Emergency Procedures
+
+#### Code Recovery
+```bash
+# If everything breaks
+git checkout main
+git pull origin main
+git checkout -b feature/recovery-start
+
+# Reset to last known good state
+git log --oneline --graph
+git reset --hard <commit-hash>
+```
+
+#### Hotfix Process
+```bash
+# Create hotfix from main
+git checkout main
+git pull origin main
+git checkout -b hotfix/critical-issue
+
+# Fix, test, commit
+git add . && git commit -m "fix(scope): critical security issue"
+
+# Merge immediately
+git checkout main
+git merge --no-ff hotfix/critical-issue
+git push origin main
+```
+
+## �📋 Agent Guidelines
 
 ### Development Agent Responsibilities
 
