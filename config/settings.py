@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # Local apps
     "apps.authentication",
+    "apps.passwords",
 ]
 
 MIDDLEWARE = [

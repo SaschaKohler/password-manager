@@ -50,7 +50,7 @@ def password_entries(request: Request) -> Response:
                 Q(title__icontains=search) |
                 Q(username_hint__icontains=search) |
                 Q(url_hint__icontains=search) |
-                Q(tags__contains=[search]
+                Q(tags__contains=[search])
             )
         
         # Category filter
@@ -438,7 +438,7 @@ def export_passwords(request: Request) -> Response:
         return Response({'error': f'Export failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-def _import_csv(file, user: User, merge_strategy: str) -> int:
+def _import_csv(file, user, merge_strategy: str) -> int:
     """Import passwords from CSV file."""
     decoded_file = file.read().decode('utf-8').splitlines()
     reader = csv.DictReader(decoded_file)
@@ -479,7 +479,7 @@ def _import_csv(file, user: User, merge_strategy: str) -> int:
     return imported_count
 
 
-def _import_json(file, user: User, merge_strategy: str) -> int:
+def _import_json(file, user, merge_strategy: str) -> int:
     """Import passwords from JSON file."""
     data = json.loads(file.read().decode('utf-8'))
     
