@@ -31,6 +31,15 @@
     }
   }
 
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (event.ctrlKey || event.metaKey) {
+        dispatch('select', password);
+      }
+    }
+  }
+
   function getLastAccessedText(): string {
     if (!password.last_accessed) return 'Never accessed';
     return `Last accessed ${formatDistanceToNow(new Date(password.last_accessed), { addSuffix: true })}`;
@@ -52,36 +61,36 @@
 </script>
 
 <div 
-  class="password-card {selected ? 'selected' : ''}"
-  class:favorite={password.is_favorite}
+  class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-medium hover:border-primary-300 transition-all duration-200 cursor-pointer {selected ? 'border-primary-500 bg-primary-50 shadow-medium' : ''} {password.is_favorite ? 'border-l-4 border-l-warning-500' : ''}"
   on:click={handleSelect}
+  on:keydown={handleKeydown}
   role="button"
   tabindex="0"
 >
-  <div class="card-header">
-    <div class="title-section">
-      <h3 class="title">{password.title}</h3>
+  <div class="flex justify-between items-start mb-3">
+    <div class="flex items-center gap-2 flex-1">
+      <h3 class="text-lg font-semibold text-gray-900 m-0 leading-tight">{password.title}</h3>
       {#if password.is_favorite}
-        <div class="favorite-indicator" title="Favorite">⭐</div>
+        <div class="text-base text-warning-500" title="Favorite">⭐</div>
       {/if}
     </div>
-    <div class="actions">
+    <div class="flex gap-1 opacity-0 transition-opacity duration-200 hover:opacity-100">
       <button 
-        class="action-btn favorite-btn" 
+        class="bg-none border-none p-1-5 rounded cursor-pointer text-sm transition-colors duration-200 flex items-center justify-center hover:bg-warning-100 hover:text-warning-600" 
         on:click|stopPropagation={handleToggleFavorite}
         title={password.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
       >
         {password.is_favorite ? '⭐' : '☆'}
       </button>
       <button 
-        class="action-btn edit-btn" 
+        class="bg-none border-none p-1-5 rounded cursor-pointer text-sm transition-colors duration-200 flex items-center justify-center hover:bg-blue-100 hover:text-blue-600" 
         on:click|stopPropagation={handleEdit}
         title="Edit password"
       >
         ✏️
       </button>
       <button 
-        class="action-btn delete-btn" 
+        class="bg-none border-none p-1-5 rounded cursor-pointer text-sm transition-colors duration-200 flex items-center justify-center hover:bg-danger-100 hover:text-danger-600" 
         on:click|stopPropagation={handleDelete}
         title="Delete password"
       >
@@ -90,51 +99,51 @@
     </div>
   </div>
 
-  <div class="card-content">
-    <div class="field">
-      <span class="field-label">Username:</span>
-      <span class="field-value">{password.username_hint}</span>
+  <div class="flex flex-col gap-2">
+    <div class="flex items-start gap-2">
+      <span class="text-xs font-medium text-gray-500 min-w-15 flex-shrink-0">Username:</span>
+      <span class="text-sm text-gray-700 flex-1 break-all">{password.username_hint}</span>
     </div>
 
     {#if password.url_hint}
-      <div class="field">
-        <span class="field-label">URL:</span>
-        <span class="field-value">{password.url_hint}</span>
+      <div class="flex items-start gap-2">
+        <span class="text-xs font-medium text-gray-500 min-w-15 flex-shrink-0">URL:</span>
+        <span class="text-sm text-gray-700 flex-1 break-all">{password.url_hint}</span>
       </div>
     {/if}
 
     {#if password.category}
-      <div class="field">
-        <span class="field-label">Category:</span>
-        <span class="field-value category">{password.category}</span>
+      <div class="flex items-start gap-2">
+        <span class="text-xs font-medium text-gray-500 min-w-15 flex-shrink-0">Category:</span>
+        <span class="bg-gray-100 px-2 py-0-5 rounded text-xs font-medium text-gray-600">{password.category}</span>
       </div>
     {/if}
 
     {#if password.tags.length > 0}
-      <div class="field">
-        <span class="field-label">Tags:</span>
-        <div class="tags">
+      <div class="flex items-start gap-2">
+        <span class="text-xs font-medium text-gray-500 min-w-15 flex-shrink-0">Tags:</span>
+        <div class="flex flex-wrap gap-1">
           {#each password.tags as tag}
-            <span class="tag">{tag}</span>
+            <span class="bg-gray-200 text-gray-700 px-2 py-0-5 rounded text-xs font-medium">{tag}</span>
           {/each}
         </div>
       </div>
     {/if}
 
     {#if password.has_notes}
-      <div class="field">
-        <span class="field-label">Notes:</span>
-        <span class="field-value">📝 Has notes</span>
+      <div class="flex items-start gap-2">
+        <span class="text-xs font-medium text-gray-500 min-w-15 flex-shrink-0">Notes:</span>
+        <span class="text-sm text-gray-700 flex-1">📝 Has notes</span>
       </div>
     {/if}
   </div>
 
-  <div class="card-footer">
-    <div class="meta-info">
-      <span class="created-date">
+  <div class="mt-3 pt-3 border-t border-gray-100">
+    <div class="flex justify-between items-center text-xs text-gray-400">
+      <span class="whitespace-nowrap">
         Created {formatDistanceToNow(new Date(password.created_at), { addSuffix: true })}
       </span>
-      <span class="last-accessed">
+      <span class="whitespace-nowrap">
         {getLastAccessedText()}
       </span>
     </div>
@@ -142,127 +151,32 @@
 </div>
 
 <style>
-  .password-card {
-    @apply bg-white border border-gray-200 rounded-xl p-4 hover:shadow-medium hover:border-primary-300 transition-all duration-200 cursor-pointer;
-  }
-
-  .password-card.selected {
-    @apply border-primary-500 bg-primary-50 shadow-medium;
-  }
-
-  .password-card.favorite {
-    @apply border-l-4 border-l-warning-500;
-  }
-
-  .card-header {
-    @apply flex justify-between items-start mb-3;
-  }
-
-  .title-section {
-    @apply flex items-center gap-2 flex-1;
-  }
-
-  .title {
-    @apply text-lg font-semibold text-gray-900 m-0 leading-tight;
-  }
-
-  .favorite-indicator {
-    @apply text-base text-warning-500;
-  }
-
-  .actions {
-    @apply flex gap-1 opacity-0 transition-opacity duration-200;
-  }
-
-  .password-card:hover .actions {
-    @apply opacity-100;
-  }
-
-  .action-btn {
-    @apply bg-none border-none p-1.5 rounded cursor-pointer text-sm transition-colors duration-200 flex items-center justify-center;
-  }
-
-  .action-btn:hover {
-    @apply bg-gray-100;
-  }
-
-  .favorite-btn:hover {
-    @apply bg-warning-100 text-warning-600;
-  }
-
-  .edit-btn:hover {
-    @apply bg-blue-100 text-blue-600;
-  }
-
-  .delete-btn:hover {
-    @apply bg-danger-100 text-danger-600;
-  }
-
-  .card-content {
-    @apply flex flex-col gap-2;
-  }
-
-  .field {
-    @apply flex items-start gap-2;
-  }
-
-  .field-label {
-    @apply text-xs font-medium text-gray-500 min-w-15 flex-shrink-0;
-  }
-
-  .field-value {
-    @apply text-sm text-gray-700 flex-1 break-all;
-  }
-
-  .field-value.category {
-    @apply bg-gray-100 px-2 py-0.5 rounded text-xs font-medium text-gray-600;
-  }
-
-  .tags {
-    @apply flex flex-wrap gap-1;
-  }
-
-  .tag {
-    @apply bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-medium;
-  }
-
-  .card-footer {
-    @apply mt-3 pt-3 border-t border-gray-100;
-  }
-
-  .meta-info {
-    @apply flex justify-between items-center text-xs text-gray-400;
-  }
-
-  .created-date,
-  .last-accessed {
-    @apply whitespace-nowrap;
-  }
-
   /* Responsive design */
   @media (max-width: 640px) {
-    .password-card {
-      @apply p-3;
+    div {
+      padding: 0.75rem !important;
     }
-
-    .title {
-      @apply text-base;
+    
+    h3 {
+      font-size: 1rem !important;
     }
-
-    .actions {
-      @apply opacity-100;
+    
+    .flex.gap-1 {
+      opacity: 1 !important;
     }
-
-    .field {
-      @apply flex-col gap-0.5;
+    
+    .flex {
+      flex-direction: column !important;
+      gap: 0.125rem !important;
     }
-
-    .field-label {
-      @apply min-w-auto;
+    
+    .min-w-15 {
+      min-width: auto !important;
     }
-
-    .meta-info {
-      @apply flex-col items-start gap-0.5;
+    
+    .items-center {
+      align-items: flex-start !important;
+      gap: 0.125rem !important;
     }
   }
 </style>
