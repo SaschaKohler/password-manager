@@ -138,7 +138,7 @@ class PasswordEntryModelTests(TestCase):
         self.assertEqual(entry.category, 'Personal')
         self.assertEqual(entry.tags, ['test', 'example'])
         self.assertTrue(entry.has_notes)
-        self.assertEqual(entry.username_hint, 'tes***')
+        self.assertEqual(entry.username_hint, 'tes*****')
         self.assertEqual(entry.url_hint, 'example.com')
     
     def test_decrypt_password_entry(self) -> None:

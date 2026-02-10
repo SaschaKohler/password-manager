@@ -98,7 +98,10 @@ class PasswordEntry(models.Model):
         """Update searchable hints from encrypted data."""
         # Username hint (first 3 characters)
         username = data.get('username', '')
-        self.username_hint = username[:3] + '*' * max(0, len(username) - 3)
+        if len(username) >= 3:
+            self.username_hint = username[:3] + '*' * (len(username) - 3)
+        else:
+            self.username_hint = username + '*' * max(0, 3 - len(username))
         
         # URL hint (domain only)
         url = data.get('url', '')
@@ -109,7 +112,8 @@ class PasswordEntry(models.Model):
             self.url_hint = ''
         
         # Notes flag
-        self.has_notes = bool(data.get('notes', '').strip())
+        notes = data.get('notes', '')
+        self.has_notes = bool(notes.strip() if notes else False)
     
     def update_from_data(self, data: Dict[str, Any]) -> None:
         """Update entry from decrypted data."""
