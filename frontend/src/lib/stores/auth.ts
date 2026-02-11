@@ -94,14 +94,33 @@ function createAuthStore() {
         
         return { success: true, user };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+        let errorMessage = 'Registration failed';
+        let fieldErrors: Record<string, string> | undefined;
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          
+          // Check if this is an ApiError with field-specific errors
+          if ('fieldErrors' in error && error.fieldErrors) {
+            fieldErrors = {};
+            // Convert string arrays to single strings for UI display
+            for (const [field, messages] of Object.entries(error.fieldErrors as Record<string, string[]>)) {
+              fieldErrors[field] = messages[0]; // Take first message for each field
+            }
+          }
+        }
+        
         update(state => ({
           ...state,
           loading: false,
           error: errorMessage,
         }));
         
-        return { success: false, error: errorMessage };
+        return { 
+          success: false, 
+          error: errorMessage,
+          fieldErrors 
+        };
       }
     },
 

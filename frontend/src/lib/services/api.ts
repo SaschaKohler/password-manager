@@ -3,7 +3,11 @@ import type { PasswordEntry, CreatePasswordData, UpdatePasswordData, AuthUser } 
 const API_BASE_URL = 'http://localhost:8000/api';
 
 class ApiError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(
+    message: string, 
+    public status: number,
+    public fieldErrors?: Record<string, string[]>
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -41,8 +45,29 @@ class PasswordAPI {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new ApiError(error.message || `HTTP ${response.status}`, response.status);
+      const errorData = await response.json().catch(() => ({}));
+      
+      // Handle validation errors (400 status with field-specific errors)
+      if (response.status === 400 && typeof errorData === 'object' && errorData !== null) {
+        // Check if this is a validation error with field-specific messages
+        const fieldErrors: Record<string, string[]> = {};
+        let hasFieldErrors = false;
+        
+        for (const [field, messages] of Object.entries(errorData)) {
+          if (Array.isArray(messages)) {
+            fieldErrors[field] = messages;
+            hasFieldErrors = true;
+          }
+        }
+        
+        if (hasFieldErrors) {
+          throw new ApiError('Validation failed', response.status, fieldErrors);
+        }
+      }
+      
+      // Handle generic errors
+      const message = errorData.error || errorData.message || `HTTP ${response.status}`;
+      throw new ApiError(message, response.status);
     }
 
     return response.json();
@@ -62,9 +87,13 @@ class PasswordAPI {
     password: string;
     master_password: string;
   }): Promise<{ token: string; user: AuthUser }> {
+    const registerData = {
+      ...userData,
+      password_confirm: userData.password, // Add password confirmation
+    };
     return this.request('/auth/register/', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify(registerData),
     });
   }
 
