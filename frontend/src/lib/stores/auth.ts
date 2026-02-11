@@ -30,29 +30,43 @@ function createAuthStore() {
 
     // Login action
     async login(email: string, password: string) {
+      console.log('Auth store: Starting login process for', email);
       update(state => ({ ...state, loading: true, error: null }));
       
       try {
+        console.log('Auth store: Calling API login');
         const response = await api.login(email, password);
+        console.log('Auth store: API response received:', response);
         const { token, user } = response;
         
         // Store token in API service
         api.setToken(token);
         
-        // Store token in localStorage
-        localStorage.setItem('auth_token', token);
+        // Store token in localStorage (only on client side)
+        if (typeof window !== 'undefined') {
+          console.log('Auth store: Storing token in localStorage');
+          localStorage.setItem('auth_token', token);
+          console.log('Auth store: Token stored successfully');
+        } else {
+          console.log('Auth store: Window is undefined, not storing token');
+        }
         
         // Update store
-        set({
+        const newState = {
           isAuthenticated: true,
           user,
           token,
           loading: false,
           error: null,
-        });
+        };
         
+        console.log('Auth store: Updating state to:', newState);
+        set(newState);
+        
+        console.log('Auth store: Login process completed successfully');
         return { success: true, user };
       } catch (error) {
+        console.error('Auth store: Login error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Login failed';
         update(state => ({
           ...state,
@@ -80,8 +94,10 @@ function createAuthStore() {
         // Store token in API service
         api.setToken(token);
         
-        // Store token in localStorage
-        localStorage.setItem('auth_token', token);
+        // Store token in localStorage (only on client side)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', token);
+        }
         
         // Update store
         set({
@@ -94,14 +110,33 @@ function createAuthStore() {
         
         return { success: true, user };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+        let errorMessage = 'Registration failed';
+        let fieldErrors: Record<string, string> | undefined;
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          
+          // Check if this is an ApiError with field-specific errors
+          if ('fieldErrors' in error && error.fieldErrors) {
+            fieldErrors = {};
+            // Convert string arrays to single strings for UI display
+            for (const [field, messages] of Object.entries(error.fieldErrors as Record<string, string[]>)) {
+              fieldErrors[field] = messages[0]; // Take first message for each field
+            }
+          }
+        }
+        
         update(state => ({
           ...state,
           loading: false,
           error: errorMessage,
         }));
         
-        return { success: false, error: errorMessage };
+        return { 
+          success: false, 
+          error: errorMessage,
+          fieldErrors 
+        };
       }
     },
 
@@ -117,8 +152,10 @@ function createAuthStore() {
         // Clear token from API service
         api.setToken('');
         
-        // Remove token from localStorage
-        localStorage.removeItem('auth_token');
+        // Remove token from localStorage (only on client side)
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+        }
         
         // Reset store
         set({
@@ -133,7 +170,15 @@ function createAuthStore() {
 
     // Check authentication status on app load
     async checkAuth() {
+      // Only check on client side
+      if (typeof window === 'undefined') {
+        console.log('Auth store: Window is undefined, skipping checkAuth');
+        return false;
+      }
+      
+      console.log('Auth store: Checking authentication status');
       const token = localStorage.getItem('auth_token');
+      console.log('Auth store: Token from localStorage:', token ? 'found' : 'not found');
       
       if (!token) {
         return false;
@@ -158,8 +203,10 @@ function createAuthStore() {
         
         return true;
       } catch (error) {
-        // Token is invalid, clear it
-        localStorage.removeItem('auth_token');
+        // Token is invalid, clear it (only on client side)
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+        }
         api.setToken('');
         
         set({

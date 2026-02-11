@@ -1,12 +1,28 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
-	import '../app.css';
+  import { onMount } from 'svelte';
+  import { auth } from '$lib/stores/auth';
+  import { goto } from '$app/navigation';
+  import '../app.css';
 
-	let { children } = $props();
+  onMount(async () => {
+    // Wait for client-side hydration
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    // Check authentication status on app load
+    await auth.checkAuth();
+    
+    // Redirect authenticated users away from auth pages
+    if ($auth.isAuthenticated) {
+      const currentPath = window.location.pathname;
+      if (currentPath === '/login' || currentPath === '/register') {
+        goto('/');
+      }
+    }
+  });
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+  <link rel="icon" href="/favicon.ico" />
 </svelte:head>
 
-{@render children()}
+<slot />

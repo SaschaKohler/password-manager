@@ -78,6 +78,374 @@ frontend/
 - **Internal**: Audit logs, usage analytics
 - **Public**: Documentation, marketing content
 
+## 🎨 Frontend Development Standards
+
+### Technology Stack
+
+- **Framework**: SvelteKit with TypeScript
+- **Styling**: Tailwind CSS with custom design system
+- **State Management**: Svelte stores
+- **Build Tool**: Vite
+- **Testing**: Vitest + Svelte Testing Library
+- **Linting**: ESLint + Prettier
+- **Type Checking**: TypeScript compiler
+
+### Code Style & Standards
+
+#### TypeScript Requirements
+```typescript
+// All components must have proper TypeScript types
+import type { AuthUser } from '$lib/types/auth';
+import { writable } from 'svelte/store';
+
+// Use interfaces for type definitions
+export interface PasswordEntry {
+  id: number;
+  title: string;
+  username_hint: string;
+  url_hint: string;
+  category: string;
+  tags: string[];
+  is_favorite: boolean;
+  has_notes: boolean;
+  created_at: string;
+  updated_at: string;
+  last_accessed: string | null;
+}
+
+// Functions must have type hints
+export function validatePassword(password: string): boolean {
+  return password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password);
+}
+```
+
+#### Component Structure
+```svelte
+<script lang="ts">
+  // 1. Imports
+  import { onMount } from 'svelte';
+  import type { PasswordEntry } from '$lib/types/password';
+  
+  // 2. Props and exports
+  export let password: PasswordEntry;
+  export let selected = false;
+  
+  // 3. Local state with types
+  let loading = false;
+  let error: string | null = null;
+  
+  // 4. Reactive statements
+  $: isValid = password.title.length > 0;
+  
+  // 5. Lifecycle
+  onMount(async () => {
+    await loadData();
+  });
+  
+  // 6. Functions with type hints
+  async function handleClick(): Promise<void> {
+    loading = true;
+    try {
+      await updatePassword();
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Unknown error';
+    } finally {
+      loading = false;
+    }
+  }
+</script>
+
+<!-- 7. Template with accessibility -->
+<div class="component-container" role="button" tabindex="0" on:keypress={handleClick}>
+  <h2>{password.title}</h2>
+  {#if loading}
+    <LoadingSpinner />
+  {:else if error}
+    <ErrorMessage message={error} />
+  {:else}
+    <button on:click={handleClick} aria-label="Update password">
+      Update
+    </button>
+  {/if}
+</div>
+
+<!-- 8. Styles with Tailwind -->
+<style>
+  .component-container {
+    @apply bg-white rounded-lg p-4 shadow-sm;
+  }
+</style>
+```
+
+### Dependencies Management
+
+```bash
+# Install dependencies
+npm install
+
+# Add new dependency
+npm install @sveltejs/adapter-auto
+
+# Add dev dependency
+npm install -D @playwright/test
+
+# Update dependencies
+npm update
+
+# Run with npm
+npm run dev
+npm run build
+npm run test
+```
+
+### Testing Standards
+
+#### Unit Testing
+```typescript
+// tests/components/PasswordCard.test.ts
+import { render, screen } from '@testing-library/svelte';
+import { describe, it, expect } from 'vitest';
+import PasswordCard from '$lib/components/PasswordCard.svelte';
+import type { PasswordEntry } from '$lib/types/password';
+
+describe('PasswordCard', () => {
+  const mockPassword: PasswordEntry = {
+    id: 1,
+    title: 'Test Password',
+    username_hint: 'tes***',
+    url_hint: 'example.com',
+    category: 'Personal',
+    tags: ['test'],
+    is_favorite: false,
+    has_notes: false,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    last_accessed: null,
+  };
+
+  it('renders password information correctly', () => {
+    render(PasswordCard, { props: { password: mockPassword } });
+    
+    expect(screen.getByText('Test Password')).toBeInTheDocument();
+    expect(screen.getByText('tes***')).toBeInTheDocument();
+  });
+
+  it('shows favorite indicator when favorited', () => {
+    const favoritePassword = { ...mockPassword, is_favorite: true };
+    render(PasswordCard, { props: { password: favoritePassword } });
+    
+    expect(screen.getByText('⭐')).toBeInTheDocument();
+  });
+});
+```
+
+#### E2E Testing with Playwright
+```typescript
+// tests/e2e/registration.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('User Registration', () => {
+  test('user can register with valid data', async ({ page }) => {
+    await page.goto('/register');
+    
+    // Fill form
+    await page.fill('[data-testid=email]', 'test@example.com');
+    await page.fill('[data-testid=username]', 'testuser');
+    await page.fill('[data-testid=password]', 'SecurePass123!');
+    await page.fill('[data-testid=confirmPassword]', 'SecurePass123!');
+    await page.fill('[data-testid=masterPassword]', 'VerySecureMasterPassword123');
+    
+    // Submit
+    await page.click('[data-testid=register-button]');
+    
+    // Should redirect to dashboard
+    await expect(page).toHaveURL('/');
+    await expect(page.locator('h1')).toContainText('Password Manager');
+  });
+
+  test('shows validation errors for duplicate email', async ({ page }) => {
+    await page.goto('/register');
+    
+    await page.fill('[data-testid=email]', 'existing@example.com');
+    await page.fill('[data-testid=username]', 'newuser');
+    await page.fill('[data-testid=password]', 'SecurePass123!');
+    await page.fill('[data-testid=confirmPassword]', 'SecurePass123!');
+    await page.fill('[data-testid=masterPassword]', 'VerySecureMasterPassword123');
+    
+    await page.click('[data-testid=register-button]');
+    
+    // Should show field-specific error
+    await expect(page.locator('[data-testid=email-error]')).toContainText('already exists');
+  });
+});
+```
+
+### Frontend Git Workflow
+
+#### Same Branching Strategy as Backend
+The frontend follows the **exact same Git workflow** as the Python backend:
+
+- **Features**: `feature/frontend-feature-name`
+- **Extensions**: `extension/frontend-extension-name`
+- **Documentation**: `docs/frontend-doc-name`
+- **Experimental**: `experimental/frontend-feature-name`
+- **Bugfixes**: `bugfix/frontend-frontend-issue`
+- **Hotfixes**: `hotfix/frontend-critical-fix`
+
+#### Frontend-Specific Commit Types
+```
+feat(frontend): add password strength indicator component
+fix(frontend): resolve responsive layout issues on mobile
+refactor(frontend): extract API service to separate module
+test(frontend): add unit tests for password validation
+style(frontend): update Tailwind CSS configuration
+docs(frontend): update Svelte component documentation
+chore(frontend): upgrade SvelteKit to latest version
+```
+
+#### Frontend Development Environment Rules
+
+##### Before Starting Frontend Work
+1. **Create new branch**: `git checkout -b feature/frontend-your-feature`
+2. **Pull latest changes**: `git pull origin develop`
+3. **Setup environment**: `cd frontend && npm install`
+
+##### During Frontend Development
+1. **Commit frequently**: `git add . && git commit -m "feat(frontend): add login form validation"`
+2. **Push regularly**: `git push origin feature/frontend-your-feature`
+3. **Run tests**: `npm run test` before each commit
+4. **Type checking**: `npm run check` includes TypeScript validation
+5. **Linting**: `npm run lint` before PR
+6. **Build check**: `npm run build` to ensure production build works
+
+##### Frontend-Specific Quality Gates
+- **TypeScript compilation**: Must pass without errors
+- **Unit tests**: Must pass with >90% coverage
+- **E2E tests**: Critical user flows must pass
+- **Accessibility**: WCAG compliance checks
+- **Performance**: Bundle size and load time limits
+- **Security**: No sensitive data in client-side code
+
+#### Frontend Pull Request Requirements
+
+##### PR Template for Frontend
+```markdown
+## Description
+Brief description of frontend changes
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+- [ ] UI/UX improvement
+
+## Frontend Testing
+- [ ] Unit tests pass (>90% coverage)
+- [ ] Integration tests pass
+- [ ] E2E tests pass for critical flows
+- [ ] Manual testing completed
+- [ ] Accessibility testing completed
+
+## Technical Requirements
+- [ ] TypeScript compilation passes
+- [ ] ESLint/Prettier checks pass
+- [ ] Build process succeeds
+- [ ] Bundle size within limits
+- [ ] Performance metrics acceptable
+
+## UI/UX Review
+- [ ] Design system compliance
+- [ ] Responsive design verified
+- [ ] Cross-browser compatibility
+- [ ] Accessibility standards met
+- [ ] Screenshots included for UI changes
+
+## Security Review
+- [ ] No sensitive data in client code
+- [ ] Input validation implemented
+- [ ] XSS prevention measures
+- [ ] CSRF protection included
+- [ ] Secure headers configured
+
+## Checklist
+- [ ] Code follows style guidelines
+- [ ] Self-review completed
+- [ ] Documentation updated
+- [ ] Tests added/updated
+- [ ] Type hints comprehensive
+```
+
+#### Frontend Emergency Procedures
+
+##### Hotfix Process for Frontend
+```bash
+# Create hotfix from main
+git checkout main
+git pull origin main
+git checkout -b hotfix/frontend-critical-ui-issue
+
+# Fix, test, commit
+cd frontend
+npm run build
+npm run test
+git add . && git commit -m "fix(frontend): critical security vulnerability in auth component"
+
+# Merge immediately
+git checkout main
+git merge --no-ff hotfix/frontend-critical-ui-issue
+git push origin main
+
+# Deploy frontend
+npm run build -- --prod
+# Deploy to production
+```
+
+### Frontend Security Guidelines
+
+#### Client-Side Security
+```typescript
+// Never store sensitive data in localStorage
+// Use secure HTTP-only cookies for tokens
+// Validate all inputs on client and server
+
+function sanitizeInput(input: string): string {
+  // Sanitize user input to prevent XSS
+  return input
+    .replace(/[<>]/g, '') // Remove potential HTML tags
+    .trim()
+    .substring(0, 1000); // Limit length
+}
+
+// Secure API calls
+async function secureAPICall(endpoint: string, data: any): Promise<any> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrfToken(),
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+  
+  return response.json();
+}
+```
+
+#### Content Security Policy
+```html
+<!-- In app.html -->
+<meta http-equiv="Content-Security-Policy" 
+      content="default-src 'self'; 
+               script-src 'self' 'unsafe-inline'; 
+               style-src 'self' 'unsafe-inline'; 
+               img-src 'self' data: https:;">
+```
+
 ## 🐍 Python Development Standards
 
 ### Code Style

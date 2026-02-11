@@ -7,6 +7,7 @@ urlpatterns = [
     path('register/', views.register, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('me/', views.get_current_user, name='get_current_user'),
     path('enable-2fa/', views.enable_2fa, name='enable_2fa'),
     path('verify-2fa-setup/', views.verify_2fa_setup, name='verify_2fa_setup'),
     path('disable-2fa/', views.disable_2fa, name='disable_2fa'),

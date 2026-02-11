@@ -9,6 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.request import Request
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, SecurityLog
 from .serializers import UserSerializer, LoginSerializer
 from .types import (
@@ -52,7 +53,7 @@ def register(request: Request) -> Response:
 @permission_classes([AllowAny])
 @csrf_exempt
 def login_view(request: Request) -> Response:
-    """Enhanced login with security monitoring."""
+    """Enhanced login with JWT tokens and security monitoring."""
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data['email']
@@ -92,15 +93,30 @@ def login_view(request: Request) -> Response:
                         'error': 'Invalid 2FA code'
                     }, status=status.HTTP_401_UNAUTHORIZED)
             
-            # Login user
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(auth_user)
+            access_token = refresh.access_token
+            
+            # Prepare user data
+            user_data = {
+                'id': auth_user.id,
+                'email': auth_user.email,
+                'username': auth_user.username,
+                'totp_enabled': auth_user.totp_enabled,
+                'password_generator_length': auth_user.password_generator_length,
+                'password_generator_symbols': auth_user.password_generator_symbols,
+            }
+            
+            # Login user (for session auth compatibility)
             login(request, auth_user)
             
-            response_data: APIResponse = {
+            response_data = {
                 'message': 'Login successful',
-                'user_id': user.id,
-                'email': user.email,
-                'totp_enabled': user.totp_enabled
+                'token': str(access_token),
+                'refresh': str(refresh),
+                'user': user_data
             }
+            
             return Response(response_data, status=status.HTTP_200_OK)
             
         except User.DoesNotExist:
@@ -120,6 +136,26 @@ def logout_view(request: Request) -> Response:
         'message': 'Logout successful'
     }
     return Response(response_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_current_user(request: Request) -> Response:
+    """Get current user information."""
+    user = request.user
+    
+    user_data = {
+        'id': user.id,
+        'email': user.email,
+        'username': user.username,
+        'totp_enabled': user.totp_enabled,
+        'password_generator_length': user.password_generator_length,
+        'password_generator_symbols': user.password_generator_symbols,
+        'last_password_change': user.last_password_change,
+        'failed_login_attempts': user.failed_login_attempts,
+    }
+    
+    return Response(user_data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

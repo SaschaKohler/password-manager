@@ -12,11 +12,12 @@ class UserSerializer(serializers.ModelSerializer):
     
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
+    master_password = serializers.CharField(write_only=True, min_length=12)
     
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'username', 'password', 'password_confirm',
+            'id', 'email', 'username', 'password', 'password_confirm', 'master_password',
             'totp_enabled', 'password_generator_length', 'password_generator_symbols'
         ]
         extra_kwargs = {
@@ -32,11 +33,12 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
+        master_password = validated_data.pop('master_password')
         
         # Generate salt and hash master password
         salt = os.urandom(16).hex()
-        password_hash = hashlib.pbkdf2_hmac('sha256', 
-                                           password.encode('utf-8'), 
+        master_password_hash = hashlib.pbkdf2_hmac('sha256', 
+                                           master_password.encode('utf-8'), 
                                            salt.encode('utf-8'), 
                                            100000).hex()
         
@@ -45,7 +47,7 @@ class UserSerializer(serializers.ModelSerializer):
         
         user = User.objects.create_user(
             password=password,
-            master_password_hash=password_hash,
+            master_password_hash=master_password_hash,
             master_password_salt=salt,
             encryption_key=encryption_key,
             **validated_data

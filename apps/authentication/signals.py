@@ -73,7 +73,7 @@ def log_failed_login(sender, credentials, request, **kwargs):
             user=user,
             event_type='failed_login',
             ip_address=get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '') if request else '',
             description=f'Failed login attempt #{user.failed_login_attempts}'
         )
     except User.DoesNotExist:
@@ -82,7 +82,7 @@ def log_failed_login(sender, credentials, request, **kwargs):
             user=None,
             event_type='failed_login',
             ip_address=get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '') if request else '',
             description=f'Failed login attempt for unknown user: {credentials.get("username", "")}'
         )
 
