@@ -32,7 +32,42 @@ function createPasswordStore() {
   // Derived store for filtered passwords
   const filteredPasswords = derived(
     { subscribe },
-    ($state) => $state.passwords
+    ($state) => {
+      let filtered = $state.passwords;
+
+      // Search filter
+      if ($state.searchQuery) {
+        const query = $state.searchQuery.toLowerCase();
+        filtered = filtered.filter(password => 
+          password.title.toLowerCase().includes(query) ||
+          password.username_hint.toLowerCase().includes(query) ||
+          password.url_hint.toLowerCase().includes(query) ||
+          password.category.toLowerCase().includes(query) ||
+          password.tags.some(tag => tag.toLowerCase().includes(query))
+        );
+      }
+
+      // Category filter
+      if ($state.selectedCategory) {
+        filtered = filtered.filter(password => 
+          password.category === $state.selectedCategory
+        );
+      }
+
+      // Tags filter
+      if ($state.selectedTags.length > 0) {
+        filtered = filtered.filter(password => 
+          $state.selectedTags.some(tag => password.tags.includes(tag))
+        );
+      }
+
+      // Favorites filter
+      if ($state.showFavoritesOnly) {
+        filtered = filtered.filter(password => password.is_favorite);
+      }
+
+      return filtered;
+    }
   );
 
   // Derived store for categories
@@ -272,7 +307,7 @@ function createPasswordStore() {
       update(state => ({ ...state, searchQuery: query }));
     },
 
-    setSelectedCategory(category: string | null) {
+    setSelectedCategory(category: string) {
       update(state => ({ ...state, selectedCategory: category }));
     },
 
@@ -280,8 +315,37 @@ function createPasswordStore() {
       update(state => ({ ...state, selectedTags: tags }));
     },
 
+    setShowFavoritesOnly(show: boolean) {
+      update(state => ({ ...state, showFavoritesOnly: show }));
+    },
+
     toggleFavoritesOnly() {
       update(state => ({ ...state, showFavoritesOnly: !state.showFavoritesOnly }));
+    },
+
+    // Apply all filters
+    applyFilters() {
+      update(state => {
+        const params: any = {};
+        
+        if (state.searchQuery) params.search = state.searchQuery;
+        if (state.selectedCategory) params.category = state.selectedCategory;
+        if (state.selectedTags.length > 0) params.tags = state.selectedTags;
+        if (state.showFavoritesOnly) params.is_favorite = true;
+        
+        return state;
+      });
+    },
+
+    // Clear all filters
+    clearFilters() {
+      update(state => ({
+        ...state,
+        searchQuery: '',
+        selectedCategory: '',
+        selectedTags: [],
+        showFavoritesOnly: false,
+      }));
     },
 
     // Pagination
