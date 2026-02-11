@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { auth } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
 
@@ -7,17 +8,38 @@
   let loading = false;
   let showPassword = false;
 
+  // Check if user is already authenticated and redirect
+  onMount(async () => {
+    if ($auth.isAuthenticated) {
+      await goto('/');
+    }
+  });
+
+  // Watch for authentication changes
+  $: if ($auth.isAuthenticated) {
+    goto('/');
+  }
+
   async function handleLogin() {
     if (!email || !password) {
       return;
     }
 
     loading = true;
-    const result = await auth.login(email, password);
-    loading = false;
-
-    if (result.success) {
-      await goto('/');
+    try {
+      const result = await auth.login(email, password);
+      
+      if (result.success) {
+        // Successful login - redirect to dashboard
+        await goto('/');
+      } else {
+        // Login failed - error is already set in the auth store
+        console.error('Login failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    } finally {
+      loading = false;
     }
   }
 

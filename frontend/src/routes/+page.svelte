@@ -24,8 +24,16 @@
     // Load passwords if authenticated
     if ($auth.isAuthenticated) {
       await passwords.loadPasswords();
+    } else {
+      // Redirect to login if not authenticated
+      await goto('/login');
     }
   });
+
+  // Watch for authentication changes
+  $: if (!$auth.isAuthenticated && !$auth.loading) {
+    goto('/login');
+  }
 
   $: showBulkActions = selectedPasswords.size > 0;
 

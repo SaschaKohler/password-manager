@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { auth } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
 
@@ -15,6 +16,18 @@
   let showMasterPassword = false;
 
   let errors: Record<string, string> = {};
+
+  // Check if user is already authenticated and redirect
+  onMount(async () => {
+    if ($auth.isAuthenticated) {
+      await goto('/');
+    }
+  });
+
+  // Watch for authentication changes
+  $: if ($auth.isAuthenticated) {
+    goto('/');
+  }
 
   function validateForm(): boolean {
     errors = {};
@@ -54,21 +67,27 @@
     if (!validateForm()) return;
 
     loading = true;
-    const result = await auth.register({
-      email,
-      username,
-      password,
-      master_password: masterPassword,
-    });
-    loading = false;
-
-    if (result.success) {
-      await goto('/');
-    } else {
-      // Handle field-specific errors
-      if (result.fieldErrors) {
-        errors = { ...errors, ...result.fieldErrors };
+    try {
+      const result = await auth.register({
+        email,
+        username,
+        password,
+        master_password: masterPassword,
+      });
+      
+      if (result.success) {
+        // Successful registration - redirect to dashboard
+        await goto('/');
+      } else {
+        // Registration failed - handle field-specific errors
+        if (result.fieldErrors) {
+          errors = { ...errors, ...result.fieldErrors };
+        }
       }
+    } catch (error) {
+      console.error('Registration error:', error);
+    } finally {
+      loading = false;
     }
   }
 
