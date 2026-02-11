@@ -222,6 +222,27 @@ class PasswordAPI {
     });
   }
 
+  // Get decrypted password
+  async getDecryptedPassword(id: number): Promise<string> {
+    return this.request(`/passwords/${id}/decrypt/`);
+  }
+
+  // Track password access
+  async trackPasswordAccess(id: number): Promise<void> {
+    await this.request(`/passwords/${id}/access/`, { method: 'POST' });
+  }
+
+  // Password History
+  async getPasswordHistory(id: number): Promise<{
+    id: number;
+    password_id: number;
+    action: string;
+    timestamp: string;
+    details: Record<string, any>;
+  }[]> {
+    return this.request(`/passwords/${id}/history/`);
+  }
+
   // Security Audit
   async getSecurityAudit(): Promise<{
     total_passwords: number;
@@ -229,9 +250,162 @@ class PasswordAPI {
     duplicate_passwords: number;
     old_passwords: number;
     shared_passwords: number;
+    breached_passwords: number;
     last_audit: string;
   }> {
     return this.request('/passwords/audit/');
+  }
+
+  // Get folders
+  async getFolders(): Promise<{
+    id: number;
+    name: string;
+    icon: string;
+    color: string;
+    password_count: number;
+    created_at: string;
+    updated_at: string;
+  }[]> {
+    return this.request('/folders/');
+  }
+
+  // Create folder
+  async createFolder(data: {
+    name: string;
+    icon?: string;
+    color?: string;
+    parent_id?: number;
+  }): Promise<{
+    id: number;
+    name: string;
+    icon: string;
+    color: string;
+  }> {
+    return this.request('/folders/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Move password to folder
+  async moveToFolder(passwordId: number, folderId: number): Promise<void> {
+    await this.request(`/passwords/${passwordId}/move/`, {
+      method: 'POST',
+      body: JSON.stringify({ folder_id: folderId }),
+    });
+  }
+
+  // Get audit logs
+  async getAuditLogs(params: {
+    page?: number;
+    page_size?: number;
+    action?: string;
+    password_id?: number;
+  } = {}): Promise<{
+    count: number;
+    results: {
+      id: number;
+      user_id: number;
+      username: string;
+      action: string;
+      password_id: number;
+      password_title: string;
+      details: Record<string, any>;
+      ip_address: string;
+      user_agent: string;
+      timestamp: string;
+    }[];
+  }> {
+    const searchParams = new URLSearchParams();
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, value.toString());
+      }
+    });
+
+    const query = searchParams.toString();
+    return this.request(`/audit/${query ? `?${query}` : ''}`);
+  }
+
+  // Enable 2FA
+  async enable2FA(): Promise<{
+    secret: string;
+    qr_code: string;
+    backup_codes: string[];
+  }> {
+    return this.request('/auth/2fa/enable/', { method: 'POST' });
+  }
+
+  // Verify 2FA setup
+  async verify2FASetup(token: string): Promise<void> {
+    await this.request('/auth/2fa/verify/', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  // Disable 2FA
+  async disable2FA(token: string): Promise<void> {
+    await this.request('/auth/2fa/disable/', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  // Check if 2FA is enabled
+  async get2FAStatus(): Promise<{
+    enabled: boolean;
+    method: string | null;
+  }> {
+    return this.request('/auth/2fa/status/');
+  }
+
+  // Share password
+  async sharePassword(data: {
+    password_id: number;
+    user_id: number;
+    permission: 'view' | 'edit';
+    expires_at?: string;
+  }): Promise<{
+    id: number;
+    shared_with: number;
+    permission: string;
+    expires_at: string | null;
+  }> {
+    return this.request('/sharing/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Get shared passwords
+  async getSharedPasswords(): Promise<{
+    shared_with_me: {
+      id: number;
+      password_id: number;
+      password_title: string;
+      shared_by: number;
+      shared_by_username: string;
+      permission: string;
+      shared_at: string;
+    }[];
+    shared_by_me: {
+      id: number;
+      password_id: number;
+      password_title: string;
+      shared_with: number;
+      shared_with_username: string;
+      permission: string;
+      shared_at: string;
+    }[];
+  }> {
+    return this.request('/sharing/');
+  }
+
+  // Revoke sharing
+  async revokeSharing(shareId: number): Promise<void> {
+    await this.request(`/sharing/${shareId}/`, { method: 'DELETE' });
   }
 
   // Import/Export

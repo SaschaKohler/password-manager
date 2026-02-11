@@ -10,13 +10,17 @@
 
   // Check if user is already authenticated and redirect
   onMount(async () => {
+    // Wait for client-side hydration
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
     if ($auth.isAuthenticated) {
-      await goto('/');
+      goto('/');
     }
   });
 
   // Watch for authentication changes
   $: if ($auth.isAuthenticated) {
+    console.log('User authenticated, redirecting to dashboard...');
     goto('/');
   }
 
@@ -26,12 +30,18 @@
     }
 
     loading = true;
+    console.log('Attempting login with:', email);
+    
     try {
       const result = await auth.login(email, password);
+      console.log('Login result:', result);
       
       if (result.success) {
+        console.log('Login successful, redirecting to dashboard...');
         // Successful login - redirect to dashboard
-        await goto('/');
+        console.log('About to call goto("/")');
+        goto('/');
+        console.log('goto("/") called');
       } else {
         // Login failed - error is already set in the auth store
         console.error('Login failed:', result.error);

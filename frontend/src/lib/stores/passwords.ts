@@ -377,3 +377,4 @@ function createPasswordStore() {
 }
 
 export const passwords = createPasswordStore();
+export const { filteredPasswords, categories, allTags } = passwords;
