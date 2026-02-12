@@ -126,18 +126,24 @@ class PasswordEncryption:
         except Exception as e:
             raise DecryptionError(f"Decryption failed: {str(e)}")
     
-    def encrypt_password_entry(self, title: str, username: str, password: str, 
-                              url: Optional[str] = None, notes: Optional[str] = None) -> str:
+    def encrypt_password_entry(self, title: str, username: str, password: str,
+                              url: Optional[str] = None, notes: Optional[str] = None,
+                              username2: Optional[str] = None, username3: Optional[str] = None,
+                              otp_url: Optional[str] = None, custom_fields: Optional[dict] = None) -> str:
         """
         Encrypt a complete password entry.
-        
+
         Args:
             title: Entry title
             username: Username/email
             password: Password
             url: Optional URL
             notes: Optional notes
-            
+            username2: Optional secondary username
+            username3: Optional tertiary username
+            otp_url: Optional OTP/TOTP URL
+            custom_fields: Optional dictionary for custom fields from other password managers
+
         Returns:
             Base64-encoded encrypted entry
         """
@@ -147,9 +153,13 @@ class PasswordEncryption:
             'password': password,
             'url': url,
             'notes': notes,
+            'username2': username2,
+            'username3': username3,
+            'otp_url': otp_url,
+            'custom_fields': custom_fields or {},
             'created_at': secrets.token_hex(16)  # Unique identifier
         }
-        
+
         json_data = json.dumps(entry_data, separators=(',', ':'))
         return self.encrypt(json_data)
     

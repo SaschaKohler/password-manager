@@ -4,6 +4,7 @@
   import { auth } from '$lib/stores/auth';
   import { passwords, filteredPasswords } from '$lib/stores/passwords';
   import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   import PasswordCard from '$lib/components/PasswordCard.svelte';
   import PasswordForm from '$lib/components/PasswordForm.svelte';
   import ImportExport from '$lib/components/ImportExport.svelte';
@@ -14,6 +15,7 @@
   import FoldersManager from '$lib/components/FoldersManager.svelte';
   import AuditLogs from '$lib/components/AuditLogs.svelte';
   import SharePassword from '$lib/components/SharePassword.svelte';
+  import Pagination from '$lib/components/Pagination.svelte';
   import type { PasswordEntry } from '$lib/types/password';
 
   let selectedPasswords: Set<number> = new Set();
@@ -86,7 +88,7 @@
   });
 
   // Watch for authentication changes
-  $: if (!$auth.isAuthenticated && !$auth.loading) {
+  $: if (browser && !$auth.isAuthenticated && !$auth.loading) {
     goto('/login');
   }
 
@@ -197,6 +199,19 @@
   function handlePasswordChanged() {
     // Password changed successfully
   }
+
+  // Pagination handlers
+  async function handlePageChange(event: CustomEvent<number>) {
+    const page = event.detail;
+    passwords.setCurrentPage(page);
+    await passwords.loadPasswords({ page });
+  }
+
+  async function handlePageSizeChange(event: CustomEvent<number>) {
+    const size = event.detail;
+    passwords.setPageSize(size);
+    await passwords.loadPasswords({ page_size: size });
+  }
 </script>
 
 <svelte:head>
@@ -223,8 +238,14 @@
   {:else}
     <div class="min-h-screen flex flex-col">
       <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sticky top-0 z-100 transition-colors duration-200">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">🔐 Password Manager</h1>
+        <div class="max-w-7xl mx-auto flex justify-between items-center gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary-50 dark:bg-gray-700 flex items-center justify-center shadow-soft">🔐</div>
+            <div>
+              <h1 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Vaultspace</h1>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Secure password workspace</p>
+            </div>
+          </div>
           
           <!-- Desktop Navigation -->
           <div class="hidden md:flex gap-3 items-center">
@@ -391,14 +412,21 @@
 
         <!-- Mobile Filters Panel -->
         {#if mobileMenuOpen}
-          <div class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30 flex" on:click={() => mobileMenuOpen = false}>
-            <div class="w-80 bg-white dark:bg-gray-800 h-full overflow-y-auto" on:click|stopPropagation>
+          <div class="md:hidden fixed inset-0 z-30 flex">
+            <button
+              type="button"
+              class="absolute inset-0 bg-black bg-opacity-50"
+              on:click={() => mobileMenuOpen = false}
+              aria-label="Close filters"
+            ></button>
+            <div class="relative w-80 bg-white dark:bg-gray-800 h-full overflow-y-auto">
               <div class="p-6">
                 <div class="flex items-center justify-between mb-6">
                   <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
                   <button 
                     on:click={() => mobileMenuOpen = false}
                     class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    aria-label="Close filters"
                   >
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -469,31 +497,62 @@
         {/if}
 
         <main class="flex-1 p-4 md:p-6 overflow-y-auto">
-          <div class="mb-4 md:mb-6">
-            <div class="flex items-center gap-2">
-              {#if selectedPasswords.size > 0}
-                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedPasswords.size === $filteredPasswords.length}
-                    on:change={handleSelectAll}
-                    class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
-                  />
-                  {selectedPasswords.size} of {$filteredPasswords.length} selected
-                </label>
-              {:else}
-                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    on:change={handleSelectAll}
-                    class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
-                  />
-                  {$passwords.totalCount} passwords
-                </label>
-              {/if}
+          <section class="mb-6 card-surface p-5 md:p-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Your Password Vault</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Organize, monitor, and share credentials securely.</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button class="btn btn-secondary" on:click={() => showImportExportModal = true}>Import</button>
+                <button class="btn btn-secondary" on:click={() => showSecurityModal = true}>Security</button>
+                <button class="btn btn-primary" on:click={() => showCreateModal = true}>Add Password</button>
+              </div>
             </div>
-          </div>
+            <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="card-surface p-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Total</p>
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">{$passwords.totalCount}</p>
+              </div>
+              <div class="card-surface p-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Favorites</p>
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">{$filteredPasswords.filter(p => p.is_favorite).length}</p>
+              </div>
+              <div class="card-surface p-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Categories</p>
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">{$passwords.categories?.length ?? 0}</p>
+              </div>
+              <div class="card-surface p-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Selected</p>
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">{selectedPasswords.size}</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="card-surface p-5 md:p-6 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedPasswords.size > 0 && selectedPasswords.size === $filteredPasswords.length}
+                  on:change={handleSelectAll}
+                  class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                />
+                <p class="text-sm text-gray-700 dark:text-gray-300">
+                  {#if selectedPasswords.size > 0}
+                    {selectedPasswords.size} of {$filteredPasswords.length} selected
+                  {:else}
+                    {$passwords.totalCount} passwords
+                  {/if}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button class="btn btn-secondary" on:click={() => showFoldersModal = true}>Folders</button>
+                <button class="btn btn-secondary" on:click={() => showAuditLogsModal = true}>Audit Logs</button>
+                <button class="btn btn-secondary" on:click={() => showProfileModal = true}>Profile</button>
+              </div>
+            </div>
+          </section>
 
           {#if $passwords.loading}
             <div class="flex flex-col items-center justify-center min-h-96 gap-4">
@@ -517,7 +576,7 @@
             </div>
           {:else}
             <div class="space-y-2 md:space-y-3">
-              {#each $filteredPasswords as password (password.id)}
+              {#each $passwords.passwords as password (password.id)}
                 <PasswordCard
                   {password}
                   selected={selectedPasswords.has(password.id)}
@@ -531,6 +590,18 @@
                 />
               {/each}
             </div>
+            
+            <!-- Pagination -->
+            {#if $passwords.totalPages > 1}
+              <Pagination
+                currentPage={$passwords.currentPage}
+                totalPages={$passwords.totalPages}
+                totalCount={$passwords.totalCount}
+                pageSize={$passwords.pageSize}
+                on:pageChange={handlePageChange}
+                on:pageSizeChange={handlePageSizeChange}
+              />
+            {/if}
           {/if}
         </main>
       </div>

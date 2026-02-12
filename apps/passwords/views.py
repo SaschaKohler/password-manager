@@ -151,14 +151,15 @@ def password_entry_detail(request: Request, pk: int) -> Response:
 def password_categories(request: Request) -> Response:
     """List password categories."""
     user = request.user
-    
+
     # Get default categories if none exist
     if not user.password_categories.exists():
         PasswordCategory.get_default_categories(user)
-    
-    categories = PasswordCategory.objects.filter(user=user)
-    serializer = PasswordCategorySerializer(categories, many=True)
-    return Response(serializer.data)
+
+    categories = PasswordCategory.objects.filter(user=user).order_by('name')
+    # Return only category names as a simple string array
+    category_names = [cat.name for cat in categories]
+    return Response(category_names)
 
 
 @api_view(['POST'])
@@ -175,11 +176,15 @@ def create_category(request: Request) -> Response:
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def generate_password(request: Request) -> Response:
     """Generate a secure password."""
-    serializer = PasswordGeneratorSerializer(data=request.GET)
+    # Handle both GET (query params) and POST (body) requests
+    if request.method == 'GET':
+        serializer = PasswordGeneratorSerializer(data=request.GET)
+    else:
+        serializer = PasswordGeneratorSerializer(data=request.data)
     
     if serializer.is_valid():
         password, strength = serializer.generate_password()
@@ -365,9 +370,9 @@ def import_passwords(request: Request) -> Response:
     
     try:
         if import_format == 'csv':
-            imported_count = _import_csv(file, user, merge_strategy)
+            result = _import_csv(file, user, merge_strategy)
         elif import_format == 'json':
-            imported_count = _import_json(file, user, merge_strategy)
+            result = _import_json(file, user, merge_strategy)
         else:
             return Response({'error': 'Unsupported format'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -377,13 +382,10 @@ def import_passwords(request: Request) -> Response:
             event_type='import',
             ip_address=get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            details={'format': import_format, 'count': imported_count}
+            details={'format': import_format, 'count': result['imported']}
         )
         
-        return Response({
-            'message': f'Successfully imported {imported_count} passwords',
-            'count': imported_count
-        })
+        return Response(result)
         
     except Exception as e:
         return Response({'error': f'Import failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
@@ -438,101 +440,189 @@ def export_passwords(request: Request) -> Response:
         return Response({'error': f'Export failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-def _import_csv(file, user, merge_strategy: str) -> int:
+def _import_csv(file, user, merge_strategy: str) -> Dict[str, Any]:
     """Import passwords from CSV file."""
     decoded_file = file.read().decode('utf-8').splitlines()
     reader = csv.DictReader(decoded_file)
-    
+
     imported_count = 0
-    
+    skipped_count = 0
+    errors = []
+
     for row in reader:
         try:
             # Check if entry already exists
             existing = PasswordEntry.objects.filter(
                 user=user, title=row.get('title', '')
             ).first()
-            
+
             if existing and merge_strategy == 'skip':
+                skipped_count += 1
                 continue
-            
+
+            # Build notes from multiple sources
+            notes_parts = []
+
+            # Add main note if present
+            if row.get('note'):
+                notes_parts.append(row.get('note', ''))
+
+            # Add additional usernames if present
+            additional_usernames = []
+            if row.get('username2'):
+                additional_usernames.append(f"Username 2: {row.get('username2')}")
+            if row.get('username3'):
+                additional_usernames.append(f"Username 3: {row.get('username3')}")
+            if additional_usernames:
+                notes_parts.append("\n".join(additional_usernames))
+
+            # Add OTP URL if present
+            if row.get('otpUrl'):
+                notes_parts.append(f"OTP URL: {row.get('otpUrl')}")
+
+            # Combine all notes
+            notes = "\n\n".join(notes_parts) if notes_parts else ''
+
+            # Extract custom fields (any column not in standard fields)
+            standard_fields = {'title', 'username', 'password', 'url', 'note', 'category', 'tags',
+                            'username2', 'username3', 'otpUrl', 'source', 'source_id'}
+            custom_fields = {}
+            for key, value in row.items():
+                if key not in standard_fields and value:
+                    custom_fields[key] = value
+
             password_data = {
                 'title': row.get('title', ''),
                 'username': row.get('username', ''),
                 'password': row.get('password', ''),
                 'url': row.get('url', ''),
-                'notes': row.get('notes', ''),
+                'notes': notes,
                 'category': row.get('category', ''),
-                'tags': row.get('tags', '').split(',') if row.get('tags') else []
+                'tags': row.get('tags', '').split(',') if row.get('tags') else [],
+                'username2': row.get('username2'),
+                'username3': row.get('username3'),
+                'otp_url': row.get('otpUrl'),
+                'custom_fields': custom_fields,
+                'source': row.get('source', ''),
+                'source_id': row.get('source_id', '')
             }
-            
+
             if existing and merge_strategy == 'overwrite':
                 existing.update_from_data(password_data)
             else:
                 PasswordEntry.create_entry(user, **password_data)
-            
+
             imported_count += 1
-            
-        except Exception:
-            # Skip invalid rows
-            continue
-    
-    return imported_count
+
+        except Exception as e:
+            # Skip invalid rows and log error
+            errors.append(f"Row {imported_count + skipped_count + len(errors) + 1}: {str(e)}")
+
+    return {
+        'imported': imported_count,
+        'skipped': skipped_count,
+        'errors': errors
+    }
 
 
-def _import_json(file, user, merge_strategy: str) -> int:
+def _import_json(file, user, merge_strategy: str) -> Dict[str, Any]:
     """Import passwords from JSON file."""
     data = json.loads(file.read().decode('utf-8'))
-    
+
     if not isinstance(data, list):
         data = [data]
-    
+
     imported_count = 0
-    
+    skipped_count = 0
+    errors = []
+
     for item in data:
         try:
             # Check if entry already exists
             existing = PasswordEntry.objects.filter(
                 user=user, title=item.get('title', '')
             ).first()
-            
+
             if existing and merge_strategy == 'skip':
+                skipped_count += 1
                 continue
-            
+
+            # Build notes from multiple sources
+            notes_parts = []
+
+            # Add main note if present
+            if item.get('note'):
+                notes_parts.append(item.get('note', ''))
+
+            # Add additional usernames if present
+            additional_usernames = []
+            if item.get('username2'):
+                additional_usernames.append(f"Username 2: {item.get('username2')}")
+            if item.get('username3'):
+                additional_usernames.append(f"Username 3: {item.get('username3')}")
+            if additional_usernames:
+                notes_parts.append("\n".join(additional_usernames))
+
+            # Add OTP URL if present
+            if item.get('otpUrl'):
+                notes_parts.append(f"OTP URL: {item.get('otpUrl')}")
+
+            # Combine all notes
+            notes = "\n\n".join(notes_parts) if notes_parts else ''
+
+            # Extract custom fields (any field not in standard fields)
+            standard_fields = {'title', 'username', 'password', 'url', 'note', 'category', 'tags',
+                            'username2', 'username3', 'otpUrl', 'source', 'source_id'}
+            custom_fields = {}
+            for key, value in item.items():
+                if key not in standard_fields and value is not None:
+                    custom_fields[key] = value
+
             password_data = {
                 'title': item.get('title', ''),
                 'username': item.get('username', ''),
                 'password': item.get('password', ''),
                 'url': item.get('url', ''),
-                'notes': item.get('notes', ''),
+                'notes': notes,
                 'category': item.get('category', ''),
-                'tags': item.get('tags', [])
+                'tags': item.get('tags', []),
+                'username2': item.get('username2'),
+                'username3': item.get('username3'),
+                'otp_url': item.get('otpUrl'),
+                'custom_fields': custom_fields,
+                'source': item.get('source', ''),
+                'source_id': item.get('source_id', '')
             }
-            
+
             if existing and merge_strategy == 'overwrite':
                 existing.update_from_data(password_data)
             else:
                 PasswordEntry.create_entry(user, **password_data)
-            
+
             imported_count += 1
-            
-        except Exception:
-            # Skip invalid items
-            continue
-    
-    return imported_count
+
+        except Exception as e:
+            # Skip invalid items and log error
+            errors.append(f"Item {imported_count + skipped_count + len(errors) + 1}: {str(e)}")
+
+    return {
+        'imported': imported_count,
+        'skipped': skipped_count,
+        'errors': errors
+    }
 
 
 def _export_csv(entries, include_passwords: bool) -> Response:
     """Export passwords to CSV format."""
     output = io.StringIO()
     writer = csv.writer(output)
-    
+
     # Header
-    headers = ['title', 'username', 'url', 'notes', 'category', 'tags', 'created_at']
+    headers = ['title', 'username', 'url', 'notes', 'category', 'tags', 'created_at', 'source', 'source_id']
     if include_passwords:
         headers.insert(2, 'password')
     writer.writerow(headers)
-    
+
     # Data rows
     for entry in entries:
         try:
@@ -544,18 +634,20 @@ def _export_csv(entries, include_passwords: bool) -> Response:
                 data.get('notes', ''),
                 entry.category,
                 ','.join(entry.tags),
-                entry.created_at.isoformat()
+                entry.created_at.isoformat(),
+                entry.source,
+                entry.source_id
             ]
-            
+
             if include_passwords:
                 row.insert(2, data.get('password', ''))
-            
+
             writer.writerow(row)
-            
+
         except Exception:
             # Skip entries that can't be decrypted
             continue
-    
+
     response = Response(output.getvalue())
     response['Content-Type'] = 'text/csv'
     response['Content-Disposition'] = 'attachment; filename="passwords.csv"'
@@ -565,7 +657,7 @@ def _export_csv(entries, include_passwords: bool) -> Response:
 def _export_json(entries, include_passwords: bool) -> Response:
     """Export passwords to JSON format."""
     export_data = []
-    
+
     for entry in entries:
         try:
             data = entry.decrypt_data()
@@ -577,18 +669,21 @@ def _export_json(entries, include_passwords: bool) -> Response:
                 'category': entry.category,
                 'tags': entry.tags,
                 'created_at': entry.created_at.isoformat(),
-                'updated_at': entry.updated_at.isoformat()
+                'updated_at': entry.updated_at.isoformat(),
+                'custom_fields': data.get('custom_fields', {}),
+                'source': entry.source,
+                'source_id': entry.source_id
             }
-            
+
             if include_passwords:
                 entry_data['password'] = data.get('password', '')
-            
+
             export_data.append(entry_data)
-            
+
         except Exception:
             # Skip entries that can't be decrypted
             continue
-    
+
     response = Response(json.dumps(export_data, indent=2))
     response['Content-Type'] = 'application/json'
     response['Content-Disposition'] = 'attachment; filename="passwords.json"'

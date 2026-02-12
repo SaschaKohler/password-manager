@@ -106,7 +106,8 @@
 <svelte:window on:keydown={handleKeydown} />
 
 {#if isOpen && password}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="modal-backdrop">
+    <div class="modal modal-md">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
       <!-- Header -->
       <div class="p-6 border-b border-gray-200">
@@ -315,6 +316,7 @@
       </div>
     </div>
   </div>
+</div>
 {/if}
 
 <style>
