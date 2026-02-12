@@ -9,15 +9,18 @@ User = get_user_model()
 
 class PasswordEntrySerializer(serializers.ModelSerializer):
     """Serializer for password entries."""
-    
-    password = serializers.CharField(write_only=True, min_length=8)
+
+    password = serializers.CharField(write_only=True, min_length=8, required=False)
     username = serializers.CharField(required=False, allow_blank=True)
     url = serializers.URLField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     category = serializers.CharField(required=False, allow_blank=True)
     tags = serializers.ListField(child=serializers.CharField(), required=False)
     is_favorite = serializers.BooleanField(default=False)
-    
+    custom_fields = serializers.JSONField(required=False, default=dict)
+    source = serializers.CharField(required=False, allow_blank=True, max_length=50)
+    source_id = serializers.CharField(required=False, allow_blank=True, max_length=255)
+
     # Read-only fields from encrypted data
     id = serializers.IntegerField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
@@ -26,15 +29,16 @@ class PasswordEntrySerializer(serializers.ModelSerializer):
     username_hint = serializers.CharField(read_only=True)
     url_hint = serializers.CharField(read_only=True)
     has_notes = serializers.BooleanField(read_only=True)
-    
+
     class Meta:
         model = PasswordEntry
         fields = [
             'id', 'title', 'password', 'username', 'url', 'notes',
             'category', 'tags', 'is_favorite', 'created_at', 'updated_at',
-            'last_accessed', 'username_hint', 'url_hint', 'has_notes'
+            'last_accessed', 'username_hint', 'url_hint', 'has_notes',
+            'custom_fields', 'source', 'source_id'
         ]
-    
+
     def validate_password(self, value: str) -> str:
         """Validate password strength."""
         validation = validate_password_strength(value)
@@ -43,77 +47,90 @@ class PasswordEntrySerializer(serializers.ModelSerializer):
                 f"Password is too weak: {', '.join(validation['feedback'])}"
             )
         return value
-    
+
     def create(self, validated_data: Dict[str, Any]) -> PasswordEntry:
         """Create encrypted password entry."""
         user = self.context['request'].user
-        
+
         return PasswordEntry.create_entry(
             user=user,
             title=validated_data['title'],
             username=validated_data.get('username', ''),
-            password=validated_data['password'],
+            password=validated_data.get('password', ''),
             url=validated_data.get('url'),
             notes=validated_data.get('notes'),
             category=validated_data.get('category', ''),
             tags=validated_data.get('tags', []),
-            is_favorite=validated_data.get('is_favorite', False)
+            is_favorite=validated_data.get('is_favorite', False),
+            custom_fields=validated_data.get('custom_fields', {}),
+            source=validated_data.get('source', ''),
+            source_id=validated_data.get('source_id', '')
         )
-    
+
     def update(self, instance: PasswordEntry, validated_data: Dict[str, Any]) -> PasswordEntry:
         """Update encrypted password entry."""
         # Get current encrypted data
         current_data = instance.decrypt_data()
-        
+
         # Update with new data
-        for field in ['username', 'url', 'notes', 'category', 'tags', 'is_favorite']:
+        for field in ['username', 'url', 'notes', 'category', 'tags', 'is_favorite', 'custom_fields']:
             if field in validated_data:
                 current_data[field] = validated_data[field]
-        
+
         if 'password' in validated_data:
             current_data['password'] = validated_data['password']
-        
+
         if 'title' in validated_data:
             current_data['title'] = validated_data['title']
-        
+
+        # Update source tracking fields
+        if 'source' in validated_data:
+            instance.source = validated_data['source']
+        if 'source_id' in validated_data:
+            instance.source_id = validated_data['source_id']
+
         instance.update_from_data(current_data)
         return instance
 
 
 class PasswordEntryDetailSerializer(PasswordEntrySerializer):
     """Detailed serializer including decrypted data for viewing."""
-    
+
     decrypted_password = serializers.CharField(read_only=True)
     decrypted_username = serializers.CharField(read_only=True)
     decrypted_url = serializers.CharField(read_only=True, allow_blank=True)
     decrypted_notes = serializers.CharField(read_only=True, allow_blank=True)
-    
+    decrypted_custom_fields = serializers.JSONField(read_only=True)
+
     class Meta(PasswordEntrySerializer.Meta):
         fields = PasswordEntrySerializer.Meta.fields + [
-            'decrypted_password', 'decrypted_username', 'decrypted_url', 'decrypted_notes'
+            'decrypted_password', 'decrypted_username', 'decrypted_url', 'decrypted_notes', 'decrypted_custom_fields'
         ]
-    
+
     def to_representation(self, instance: PasswordEntry) -> Dict[str, Any]:
         """Add decrypted fields to representation."""
         data = super().to_representation(instance)
-        
+
         # Add decrypted fields
         try:
-            data['decrypted_password'] = instance.get_password()
-            data['decrypted_username'] = instance.get_username()
-            data['decrypted_url'] = instance.get_url() or ''
-            data['decrypted_notes'] = instance.get_notes() or ''
-            
+            decrypted_data = instance.decrypt_data()
+            data['decrypted_password'] = decrypted_data.get('password', '')
+            data['decrypted_username'] = decrypted_data.get('username', '')
+            data['decrypted_url'] = decrypted_data.get('url') or ''
+            data['decrypted_notes'] = decrypted_data.get('notes') or ''
+            data['decrypted_custom_fields'] = decrypted_data.get('custom_fields', {})
+
             # Log access
             instance.access()
-            
+
         except Exception:
             # If decryption fails, don't expose error
             data['decrypted_password'] = '***'
             data['decrypted_username'] = '***'
             data['decrypted_url'] = '***'
             data['decrypted_notes'] = '***'
-        
+            data['decrypted_custom_fields'] = {}
+
         return data
 
 

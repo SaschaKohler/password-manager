@@ -42,8 +42,8 @@ class UserSerializer(serializers.ModelSerializer):
                                            salt.encode('utf-8'), 
                                            100000).hex()
         
-        # Generate encryption key (in production, this should be derived from master password)
-        encryption_key = secrets.token_urlsafe(48)
+        # Generate encryption key (32 bytes for AES-256)
+        encryption_key = os.urandom(32).hex()
         
         user = User.objects.create_user(
             password=password,

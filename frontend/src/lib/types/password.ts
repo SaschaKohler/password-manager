@@ -10,6 +10,9 @@ export interface PasswordEntry {
   created_at: string;
   updated_at: string;
   last_accessed: string | null;
+  custom_fields?: Record<string, any>;
+  source?: string;
+  source_id?: string;
 }
 
 export interface CreatePasswordData {
@@ -21,6 +24,9 @@ export interface CreatePasswordData {
   category?: string;
   tags?: string[];
   is_favorite?: boolean;
+  custom_fields?: Record<string, any>;
+  source?: string;
+  source_id?: string;
 }
 
 export interface UpdatePasswordData {
@@ -32,6 +38,9 @@ export interface UpdatePasswordData {
   category?: string;
   tags?: string[];
   is_favorite?: boolean;
+  custom_fields?: Record<string, any>;
+  source?: string;
+  source_id?: string;
 }
 
 export interface PasswordOptions {

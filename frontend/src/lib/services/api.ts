@@ -31,9 +31,14 @@ class PasswordAPI {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
+
+    // Only set Content-Type to application/json if not FormData
+    // FormData requires the browser to set Content-Type with proper boundary
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
@@ -149,7 +154,7 @@ class PasswordAPI {
 
   async updatePassword(id: number, data: UpdatePasswordData): Promise<PasswordEntry> {
     return this.request(`/passwords/${id}/`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }
@@ -418,6 +423,10 @@ class PasswordAPI {
     formData.append('file', file);
     formData.append('merge_strategy', mergeStrategy);
 
+    // Detect format from file extension
+    const format = file.name.toLowerCase().endsWith('.json') ? 'json' : 'csv';
+    formData.append('format', format);
+
     return this.request('/passwords/import/', {
       method: 'POST',
       body: formData,
@@ -425,8 +434,8 @@ class PasswordAPI {
     });
   }
 
-  async exportPasswords(format: 'csv' | 'json' = 'csv'): Promise<Blob> {
-    const response = await fetch(`${this.baseURL}/passwords/export/?format=${format}`, {
+  async exportPasswords(format: 'csv' | 'json' = 'csv', includePasswords: boolean = true): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/passwords/export/?format=${format}&include_passwords=${includePasswords}`, {
       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
     });
 

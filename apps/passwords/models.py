@@ -14,7 +14,7 @@ User = get_user_model()
 
 class PasswordEntry(models.Model):
     """Encrypted password entry for users."""
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_entries')
     title = models.CharField(max_length=255)  # Stored in plaintext for searching
     encrypted_data = models.TextField()  # Base64-encoded encrypted JSON data
@@ -24,11 +24,19 @@ class PasswordEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_accessed = models.DateTimeField(null=True, blank=True)
-    
+
     # Metadata (stored in plaintext for filtering/sorting)
     username_hint = models.CharField(max_length=255, blank=True)  # First few chars only
     url_hint = models.CharField(max_length=255, blank=True)  # Domain only
     has_notes = models.BooleanField(default=False)
+
+    # Custom fields for flexible schema (for imports from other password managers)
+    # Stores additional fields that don't fit the standard schema
+    custom_fields = models.JSONField(default=dict, blank=True)
+
+    # Source tracking for imports
+    source = models.CharField(max_length=50, blank=True, default='')  # e.g., '1password', 'bitwarden', 'lastpass'
+    source_id = models.CharField(max_length=255, blank=True, default='')  # Original ID from source
     
     class Meta:
         db_table = 'password_entries'
@@ -46,9 +54,9 @@ class PasswordEntry(models.Model):
     
     def get_encryption_key(self) -> bytes:
         """Get user's encryption key."""
-        # In production, this would retrieve from secure storage
-        # For now, we'll use the user's encryption_key field
-        return self.user.encryption_key.encode('utf-8')
+        # The encryption_key is stored as a hex string in the database
+        # Decode it to bytes for use with AES-256
+        return bytes.fromhex(self.user.encryption_key)
     
     def encrypt_data(self, data: Dict[str, Any]) -> str:
         """Encrypt password entry data."""
@@ -60,7 +68,11 @@ class PasswordEntry(models.Model):
                 username=data.get('username', ''),
                 password=data.get('password', ''),
                 url=data.get('url', ''),
-                notes=data.get('notes', '')
+                notes=data.get('notes', ''),
+                username2=data.get('username2'),
+                username3=data.get('username3'),
+                otp_url=data.get('otp_url'),
+                custom_fields=data.get('custom_fields')
             )
         except Exception as e:
             raise EncryptionError(f"Failed to encrypt password entry: {str(e)}")
@@ -122,6 +134,9 @@ class PasswordEntry(models.Model):
         self.category = data.get('category', '')
         self.tags = data.get('tags', [])
         self.is_favorite = data.get('is_favorite', False)
+        self.custom_fields = data.get('custom_fields', {})
+        self.source = data.get('source', '')
+        self.source_id = data.get('source_id', '')
         self.update_hints(data)
         self.save()
     
@@ -134,7 +149,10 @@ class PasswordEntry(models.Model):
     def create_entry(cls, user: User, title: str, username: str, password: str,
                      url: Optional[str] = None, notes: Optional[str] = None,
                      category: str = '', tags: Optional[List[str]] = None,
-                     is_favorite: bool = False) -> 'PasswordEntry':
+                     is_favorite: bool = False, username2: Optional[str] = None,
+                     username3: Optional[str] = None, otp_url: Optional[str] = None,
+                     custom_fields: Optional[Dict[str, Any]] = None,
+                     source: str = '', source_id: str = '') -> 'PasswordEntry':
         """Create a new password entry."""
         data = {
             'title': title,
@@ -144,16 +162,24 @@ class PasswordEntry(models.Model):
             'notes': notes,
             'category': category,
             'tags': tags or [],
-            'is_favorite': is_favorite
+            'is_favorite': is_favorite,
+            'username2': username2,
+            'username3': username3,
+            'otp_url': otp_url,
+            'custom_fields': custom_fields or {},
+            'source': source,
+            'source_id': source_id
         }
-        
+
         entry = cls(user=user, title=title, category=category or '',
-                    tags=tags or [], is_favorite=is_favorite)
-        
+                    tags=tags or [], is_favorite=is_favorite,
+                    custom_fields=custom_fields or {},
+                    source=source, source_id=source_id)
+
         entry.encrypted_data = entry.encrypt_data(data)
         entry.update_hints(data)
         entry.save()
-        
+
         return entry
 
 

@@ -13,6 +13,7 @@ interface PasswordState {
   currentPage: number;
   totalPages: number;
   totalCount: number;
+  pageSize: number;
 }
 
 function createPasswordStore() {
@@ -27,6 +28,7 @@ function createPasswordStore() {
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
+    pageSize: 20,
   });
 
   // Derived store for filtered passwords
@@ -103,17 +105,29 @@ function createPasswordStore() {
       page?: number;
       page_size?: number;
     } = {}) {
+      let currentState: PasswordState | undefined;
+      const unsubscribe = subscribe(state => { currentState = state; });
+      unsubscribe();
+      
+      const pageSize = params.page_size ?? currentState?.pageSize ?? 20;
+      const page = params.page ?? currentState?.currentPage ?? 1;
+      
       update(state => ({ ...state, loading: true, error: null }));
       
       try {
-        const response = await api.getPasswords(params);
+        const response = await api.getPasswords({
+          ...params,
+          page,
+          page_size: pageSize,
+        });
         
         update(state => ({
           ...state,
           passwords: response.results,
           totalCount: response.count,
-          totalPages: Math.ceil(response.count / (params.page_size || 20)),
-          currentPage: params.page || 1,
+          totalPages: Math.ceil(response.count / pageSize),
+          currentPage: page,
+          pageSize,
           loading: false,
           error: null,
         }));
@@ -353,6 +367,10 @@ function createPasswordStore() {
       update(state => ({ ...state, currentPage: page }));
     },
 
+    setPageSize(size: number) {
+      update(state => ({ ...state, pageSize: size, currentPage: 1 }));
+    },
+
     // Clear error
     clearError() {
       update(state => ({ ...state, error: null }));
@@ -371,6 +389,7 @@ function createPasswordStore() {
         currentPage: 1,
         totalPages: 1,
         totalCount: 0,
+        pageSize: 20,
       });
     },
   };
